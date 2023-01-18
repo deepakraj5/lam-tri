@@ -1,0 +1,54 @@
+service: lam-tri
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs16.x
+  region: ap-south-1
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - sqs:*
+      Resource:
+        - 'arn:aws:sqs:ap-south-1:507304958873:sample-queue-dev'
+
+functions:
+  hello:
+    handler: handler.hello
+    events:
+    - sqs:
+        arn: arn:aws:sqs:ap-south-1:507304958873:sample-queue-dev
+
+
+resources:
+  Resources:
+    NewSQSQueue:
+      Type: "AWS::SQS::Queue"
+      Properties:
+        QueueName: sample-queue-dev
+    
+    NewSNSTopic:
+      Type: "AWS::SNS::Topic"
+      Properties:
+        Subscription:
+          - Protocol: sqs
+            Endpoint: arn:aws:sqs:ap-south-1:507304958873:sample-queue-dev
+
+    SnsToSqsPolicy:
+      Type: AWS::SQS::QueuePolicy
+      Properties:
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Sid: "Allow SNS publish to SQS"
+              Effect: Allow
+              Principal: 
+                Service: "sns.amazonaws.com"
+              Resource: !GetAtt NewSQSQueue.Arn
+              Action: SQS:SendMessage
+              Condition:
+                ArnEquals:
+                  aws:SourceArn: !Ref NewSNSTopic
+        Queues:
+          - Ref: NewSQSQueue
